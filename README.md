@@ -96,15 +96,7 @@ lib/
 
 - [ ] Integração com API de filmes (TMDB)
 - [ ] Sistema de avaliações
-- [ ] Modo escuro
-- [ ] Notificações push
-- [ ] Compartilhamento de filmes
 - [ ] Lista de desejos
-- [ ] Histórico de visualizações
-
-## 🤝 Contribuição
-
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.
 
 ## 📄 Licença
 
