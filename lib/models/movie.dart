@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-
+// REQUISITO: models/ - Classes de modelo, como a Transferencia no BankApp
 class Movie {
   final String title;
   final String? description;
@@ -31,5 +30,3 @@ class Movie {
     );
   }
 }
-
-

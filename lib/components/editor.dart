@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// REQUISITO: components/ - Widgets reutilizáveis (Editor, botões, inputs, etc.)
 class Editor extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -32,5 +33,3 @@ class Editor extends StatelessWidget {
     );
   }
 }
-
-

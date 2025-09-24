@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../components/editor.dart';
 import '../../models/movie.dart';
 
+// REQUISITO: Tela de Formulário – Cadastro - Permitir adicionar novos itens à lista
 class MovieFormScreen extends StatefulWidget {
   const MovieFormScreen({super.key});
 
@@ -29,6 +30,7 @@ class _MovieFormScreenState extends State<MovieFormScreen> {
             ? null
             : _descriptionController.text.trim(),
       );
+      // REQUISITO: Navegação Entre Telas - Navigator.pop() para retornar dados
       Navigator.pop(context, movie);
     }
   }
@@ -43,6 +45,7 @@ class _MovieFormScreenState extends State<MovieFormScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // REQUISITO: Tela de Formulário – Cadastro - Utilizar campos TextField com Editor
               Editor(
                 controller: _titleController,
                 label: 'Título',
@@ -76,5 +79,3 @@ class _MovieFormScreenState extends State<MovieFormScreen> {
     );
   }
 }
-
-

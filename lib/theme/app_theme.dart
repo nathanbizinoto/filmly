@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// REQUISITO: Temas e Estilização - Personalizar cores, botões e AppBar utilizando Material 3
 class AppTheme {
   static const Color primaryBlue = Color(0xFF6366F1);
   static const Color primaryPurple = Color(0xFF8B5CF6);
@@ -13,6 +14,7 @@ class AppTheme {
 
   static ThemeData get lightTheme {
     return ThemeData(
+      // REQUISITO: Temas e Estilização - Utilizar Material 3
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,

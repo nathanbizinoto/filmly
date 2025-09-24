@@ -5,6 +5,7 @@ import '../../widgets/movie_card.dart';
 import '../../services/tmdb_service.dart';
 import 'formulario.dart';
 
+// REQUISITO: screens/ - Telas do app (lista, formulário, detalhes)
 class MovieListScreen extends StatefulWidget {
   const MovieListScreen({super.key});
 
@@ -42,12 +43,14 @@ class _MovieListScreenState extends State<MovieListScreen> {
     }
   }
 
+  // REQUISITO: Navegação Entre Telas - Navigator.push() para abrir formulário
   Future<void> _openForm() async {
     final result = await Navigator.push<Movie>(
       context,
       MaterialPageRoute(builder: (_) => const MovieFormScreen()),
     );
     if (result != null) {
+      // REQUISITO: Atualização Dinâmica da Lista - setState() para atualizar lista
       setState(() => _movies.add(result));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Filme adicionado!')),
@@ -57,6 +60,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // REQUISITO: Formatação de Valores - Formatação de data Brasil: dia/mês/ano
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
     return Scaffold(
       appBar: AppBar(title: const Text('Meus filmes (lista)')),
@@ -103,32 +107,32 @@ class _MovieListScreenState extends State<MovieListScreen> {
                   ),
                 )
               : _movies.isEmpty
-          ? const Center(child: Text('Nenhum filme. Toque em + para adicionar.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _movies.length,
-              itemBuilder: (_, index) {
-                final movie = _movies[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MovieCard(
-                        title: movie.title,
-                        subtitle: movie.description ??
-                            'Criado em ${dateFormat.format(movie.createdAt)}',
-                        imageUrl: movie.posterUrl,
-                        showFavoriteIcon: false,
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                  ? const Center(
+                      child: Text('Nenhum filme. Toque em + para adicionar.'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _movies.length,
+                      itemBuilder: (_, index) {
+                        final movie = _movies[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // REQUISITO: Tela Inicial – Lista - Exibir lista dinâmica em Card
+                              MovieCard(
+                                title: movie.title,
+                                subtitle: movie.description ??
+                                    'Criado em ${dateFormat.format(movie.createdAt)}',
+                                imageUrl: movie.posterUrl,
+                                showFavoriteIcon: false,
+                                onTap: () {},
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
     );
   }
 }
-
-

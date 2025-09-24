@@ -4,6 +4,7 @@ import 'screens/home_screen.dart';
 import 'screens/movies/lista.dart';
 import 'theme/app_theme.dart';
 
+// REQUISITO: main.dart - Ponto de entrada e configuração global do aplicativo
 void main() {
   runApp(const FilmlyApp());
 }
@@ -16,6 +17,7 @@ class FilmlyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Filmly',
       debugShowCheckedModeBanner: false,
+      // REQUISITO: Temas e Estilização - Configurar um tema global usando ThemeData
       theme: AppTheme.lightTheme,
       initialRoute: '/login',
       routes: {
