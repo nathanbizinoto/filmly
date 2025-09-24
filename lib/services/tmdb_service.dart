@@ -34,20 +34,40 @@ class TmdbService {
 
   Future<List<Movie>> popularMovies() async {
     final uri = Uri.parse('$_base/movie/popular?api_key=$_apiKey&language=pt-BR&page=1');
-    final resp = await http.get(uri, headers: _headers);
-    if (resp.statusCode != 200) {
-      throw Exception('TMDB popular error: ${resp.statusCode}');
+    
+    try {
+      print('🔍 Fazendo requisição para: $uri');
+      final resp = await http.get(uri, headers: _headers);
+      
+      print('📡 Status da resposta: ${resp.statusCode}');
+      
+      if (resp.statusCode != 200) {
+        print('❌ Erro na API: ${resp.statusCode} - ${resp.body}');
+        throw Exception('TMDB popular error: ${resp.statusCode} - ${resp.body}');
+      }
+      
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final results = (data['results'] as List<dynamic>?) ?? [];
+      
+      print('🎬 Filmes encontrados: ${results.length}');
+      
+      return results.map((e) {
+        final map = e as Map<String, dynamic>;
+        final posterPath = map['poster_path'];
+        final posterUrl = posterPath != null ? '$_images$posterPath' : null;
+        
+        print('🎭 Filme: ${map['title']} - Poster: $posterUrl');
+        
+        return Movie(
+          title: map['title'] ?? 'Sem título',
+          description: map['overview'],
+          posterUrl: posterUrl,
+        );
+      }).toList();
+    } catch (e) {
+      print('💥 Erro na requisição: $e');
+      rethrow;
     }
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    final results = (data['results'] as List<dynamic>?) ?? [];
-    return results.map((e) {
-      final map = e as Map<String, dynamic>;
-      return Movie(
-        title: map['title'] ?? 'Sem título',
-        description: map['overview'],
-        posterUrl: map['poster_path'] != null ? '$_images${map['poster_path']}' : null,
-      );
-    }).toList();
   }
 }
 

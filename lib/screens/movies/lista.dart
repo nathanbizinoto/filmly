@@ -30,10 +30,13 @@ class _MovieListScreenState extends State<MovieListScreen> {
       _error = '';
     });
     try {
+      print('🚀 Iniciando carregamento de filmes populares...');
       final data = await _service.popularMovies();
+      print('✅ ${data.length} filmes carregados com sucesso!');
       setState(() => _movies.addAll(data));
     } catch (e) {
-      setState(() => _error = 'Falha ao carregar filmes populares');
+      print('💥 Erro ao carregar filmes: $e');
+      setState(() => _error = 'Erro ao carregar filmes: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -64,7 +67,41 @@ class _MovieListScreenState extends State<MovieListScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error.isNotEmpty
-              ? Center(child: Text(_error))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red.shade300,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Erro ao carregar filmes',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          _error,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadPopular,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                )
               : _movies.isEmpty
           ? const Center(child: Text('Nenhum filme. Toque em + para adicionar.'))
           : ListView.builder(

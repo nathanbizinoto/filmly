@@ -40,6 +40,7 @@ class MovieCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Movie Poster
             Container(
@@ -50,27 +51,30 @@ class MovieCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  // Movie Image Placeholder
-                  Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
+                  // Movie Image
+                  if (imageUrl != null && imageUrl!.isNotEmpty)
+                    ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.grey.shade300,
-                          Colors.grey.shade400,
-                        ],
+                      child: Image.network(
+                        imageUrl!,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          print('❌ Erro ao carregar imagem: $imageUrl - $error');
+                          return _buildPlaceholder();
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) {
+                            print('✅ Imagem carregada com sucesso: $imageUrl');
+                            return child;
+                          }
+                          return _buildLoadingPlaceholder();
+                        },
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.movie,
-                      size: 40,
-                      color: Colors.white,
-                    ),
-                  ),
+                    )
+                  else
+                    _buildPlaceholder(),
 
                   // Favorite Icon
                   if (showFavoriteIcon)
@@ -102,30 +106,73 @@ class MovieCard extends StatelessWidget {
             const SizedBox(height: 8),
 
             // Movie Title
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
 
             if (subtitle != null) ...[
               const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
+              Flexible(
+                child: Text(
+                  subtitle!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade300,
+            Colors.grey.shade400,
+          ],
+        ),
+      ),
+      child: const Icon(
+        Icons.movie,
+        size: 40,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey.shade200,
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
         ),
       ),
     );

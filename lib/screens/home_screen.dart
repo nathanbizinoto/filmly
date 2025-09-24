@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/movie_section.dart';
 import '../theme/app_theme.dart';
+import '../services/tmdb_service.dart';
+import '../models/movie.dart';
 import 'favorites_screen.dart';
 import 'watched_screen.dart';
 import 'profile_screen.dart';
@@ -16,54 +18,53 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  
+  // Serviço TMDB
+  final TmdbService _tmdbService = TmdbService();
+  
+  // Listas de filmes reais
+  List<Movie> _popularMovies = [];
+  List<Movie> _favoriteMovies = [];
+  List<Movie> _watchedMovies = [];
+  
+  bool _loading = false;
+  String _error = '';
 
-  // Mock data for movies
-  final List<Map<String, dynamic>> _suggestions = [
-    {
-      'title': 'Avatar: O Caminho da Água',
-      'subtitle': '2022 • Ficção Científica',
-      'isFavorite': false,
-    },
-    {
-      'title': 'Top Gun: Maverick',
-      'subtitle': '2022 • Ação',
-      'isFavorite': true,
-    },
-    {
-      'title': 'Pantera Negra 2',
-      'subtitle': '2022 • Ação',
-      'isFavorite': false,
-    },
-  ];
-
-  final List<Map<String, dynamic>> _favorites = [
-    {
-      'title': 'Interestelar',
-      'subtitle': '2014 • Ficção Científica',
-      'isFavorite': true,
-    },
-    {
-      'title': 'O Poderoso Chefão',
-      'subtitle': '1972 • Drama',
-      'isFavorite': true,
-    },
-    {'title': 'Pulp Fiction', 'subtitle': '1994 • Crime', 'isFavorite': true},
-  ];
-
-  final List<Map<String, dynamic>> _myMovies = [
-    {
-      'title': 'Vingadores: Ultimato',
-      'subtitle': '2019 • Ação',
-      'isFavorite': false,
-    },
-    {'title': 'Coringa', 'subtitle': '2019 • Drama', 'isFavorite': true},
-    {'title': 'Parasita', 'subtitle': '2019 • Thriller', 'isFavorite': false},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadMovies();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMovies() async {
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    
+    try {
+      print('🏠 Carregando filmes para a tela inicial...');
+      final movies = await _tmdbService.popularMovies();
+      
+      setState(() {
+        _popularMovies = movies.take(6).toList(); // Primeiros 6 filmes para sugestões
+        _loading = false;
+      });
+      
+      print('✅ ${_popularMovies.length} filmes carregados para a tela inicial');
+    } catch (e) {
+      print('💥 Erro ao carregar filmes na tela inicial: $e');
+      setState(() {
+        _error = 'Erro ao carregar filmes: $e';
+        _loading = false;
+      });
+    }
   }
 
   Widget _buildHomeContent() {
@@ -156,15 +157,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Suggestions Section
         SliverToBoxAdapter(
-          child: MovieSection(
-            title: 'Sugestões',
-            movies: _suggestions,
-            onSeeAll: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Ver todas as sugestões')),
-              );
-            },
-          ),
+          child: _loading
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : _error.isNotEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Text('Erro: $_error'),
+                            ElevatedButton(
+                              onPressed: _loadMovies,
+                              child: const Text('Tentar novamente'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : MovieSection(
+                      title: 'Sugestões',
+                      movies: _popularMovies.map((movie) => {
+                        'title': movie.title,
+                        'subtitle': movie.description ?? 'Sem descrição',
+                        'imageUrl': movie.posterUrl,
+                        'isFavorite': movie.isFavorite,
+                      }).toList(),
+                      onSeeAll: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MovieListScreen()),
+                        );
+                      },
+                    ),
         ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -173,7 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: MovieSection(
             title: 'Favoritos',
-            movies: _favorites,
+            movies: _favoriteMovies.map((movie) => {
+              'title': movie.title,
+              'subtitle': movie.description ?? 'Sem descrição',
+              'imageUrl': movie.posterUrl,
+              'isFavorite': movie.isFavorite,
+            }).toList(),
             onSeeAll: () {
               setState(() {
                 _currentIndex = 1; // Navigate to favorites tab
@@ -187,8 +219,13 @@ class _HomeScreenState extends State<HomeScreen> {
         // My Movies Section
         SliverToBoxAdapter(
           child: MovieSection(
-            title: 'Meus Filmes',
-            movies: _myMovies,
+            title: 'Assistidos',
+            movies: _watchedMovies.map((movie) => {
+              'title': movie.title,
+              'subtitle': movie.description ?? 'Sem descrição',
+              'imageUrl': movie.posterUrl,
+              'isFavorite': movie.isFavorite,
+            }).toList(),
             onSeeAll: () {
               setState(() {
                 _currentIndex = 2; // Navigate to watched tab
