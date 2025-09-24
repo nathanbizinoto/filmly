@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import 'favorites_screen.dart';
 import 'watched_screen.dart';
 import 'profile_screen.dart';
+import 'movies/lista.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -93,6 +94,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   _currentIndex = 3; // Navigate to profile tab
                 });
               },
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.list_alt,
+                color: AppTheme.textPrimary,
+                size: 26,
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MovieListScreen()),
+                );
+              },
+              tooltip: 'Lista dinâmica',
             ),
             const SizedBox(width: 8),
           ],
@@ -208,6 +223,20 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppTheme.lightBackground,
       body: SafeArea(
         child: _getCurrentScreen(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          // Atalho direto para o formulário, mantendo a home simples.
+          final result = await Navigator.pushNamed(context, '/movies');
+          if (!mounted) return;
+          if (result != null) {
+            // Apenas feedback; a lista dinâmica está na tela de Movies.
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Item criado na lista de filmes.')),
+            );
+          }
+        },
+        child: const Icon(Icons.add),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
