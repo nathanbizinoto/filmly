@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/movie_section.dart';
-import '../widgets/movie_card.dart';
 import '../theme/app_theme.dart';
-import '../services/tmdb_service.dart';
 import '../models/movie.dart';
+import '../database/movie_dao.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -13,14 +12,21 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  final TmdbService _tmdbService = TmdbService();
   List<Movie> _favoriteMovies = [];
   bool _loading = false;
   String _error = '';
+  final MovieDao _movieDao = MovieDao();
 
   @override
   void initState() {
     super.initState();
+    _loadFavoriteMovies();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recarrega quando a tela é acessada novamente
     _loadFavoriteMovies();
   }
 
@@ -31,12 +37,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     });
     
     try {
-      print('❤️ Carregando filmes favoritos...');
-      final movies = await _tmdbService.popularMovies();
+      print('❤️ Carregando filmes favoritos do banco de dados...');
+      final favoriteMovies = await _movieDao.findFavorites();
       
-      // Simular alguns favoritos (primeiros 5 filmes)
       setState(() {
-        _favoriteMovies = movies.take(5).map((movie) => movie.copyWith(isFavorite: true)).toList();
+        _favoriteMovies = favoriteMovies;
         _loading = false;
       });
       
@@ -146,11 +151,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         child: MovieSection(
                           title: 'Seus Filmes Favoritos',
                           movies: _favoriteMovies.map((movie) => {
+                            'id': movie.id,
                             'title': movie.title,
                             'subtitle': movie.description ?? 'Sem descrição',
                             'imageUrl': movie.posterUrl,
                             'isFavorite': movie.isFavorite,
-                          }).toList(),
+                            'isWatched': movie.isWatched,
+                          },).toList(),
+                          onFavoriteToggle: (movieId, isFavorite) async {
+                            if (movieId != null) {
+                              await _movieDao.updateFavoriteStatus(movieId, isFavorite);
+                              await _loadFavoriteMovies();
+                            }
+                          },
+                          onWatchedToggle: (movieId, isWatched) async {
+                            if (movieId != null) {
+                              await _movieDao.updateWatchedStatus(movieId, isWatched);
+                              await _loadFavoriteMovies();
+                            }
+                          },
                         ),
                       ),
 

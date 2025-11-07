@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/movie_section.dart';
-import '../widgets/movie_card.dart';
 import '../theme/app_theme.dart';
-import '../services/tmdb_service.dart';
 import '../models/movie.dart';
+import '../database/movie_dao.dart';
 
 class WatchedScreen extends StatefulWidget {
   const WatchedScreen({super.key});
@@ -13,14 +12,21 @@ class WatchedScreen extends StatefulWidget {
 }
 
 class _WatchedScreenState extends State<WatchedScreen> {
-  final TmdbService _tmdbService = TmdbService();
   List<Movie> _watchedMovies = [];
   bool _loading = false;
   String _error = '';
+  final MovieDao _movieDao = MovieDao();
 
   @override
   void initState() {
     super.initState();
+    _loadWatchedMovies();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recarrega quando a tela é acessada novamente
     _loadWatchedMovies();
   }
 
@@ -29,17 +35,16 @@ class _WatchedScreenState extends State<WatchedScreen> {
       _loading = true;
       _error = '';
     });
-    
+
     try {
-      print('🎬 Carregando filmes assistidos...');
-      final movies = await _tmdbService.popularMovies();
-      
-      // Simular alguns filmes assistidos (filmes 5-10)
+      print('🎬 Carregando filmes assistidos do banco de dados...');
+      final watchedMovies = await _movieDao.findWatched();
+
       setState(() {
-        _watchedMovies = movies.skip(5).take(8).toList();
+        _watchedMovies = watchedMovies;
         _loading = false;
       });
-      
+
       print('✅ ${_watchedMovies.length} filmes assistidos carregados');
     } catch (e) {
       print('💥 Erro ao carregar filmes assistidos: $e');
@@ -52,7 +57,6 @@ class _WatchedScreenState extends State<WatchedScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return CustomScrollView(
       slivers: [
         // App Bar
@@ -73,39 +77,7 @@ class _WatchedScreenState extends State<WatchedScreen> {
 
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-        // Stats Section
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem(
-                      'Filmes', '${_watchedMovies.length}', Icons.movie),
-                  _buildStatItem('Horas', '${_watchedMovies.length * 2}h', Icons.access_time),
-                  _buildStatItem('Gênero', 'Variado', Icons.category),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-        // Watched Movies Content
+        // Watched Content
         _loading
             ? const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
@@ -148,13 +120,13 @@ class _WatchedScreenState extends State<WatchedScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.movie_outlined,
+                                Icons.movie_filter_outlined,
                                 size: 64,
                                 color: Colors.grey.shade400,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Nenhum filme assistido',
+                                'Nenhum filme assistido ainda',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
@@ -163,7 +135,7 @@ class _WatchedScreenState extends State<WatchedScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Comece a marcar filmes como\nassistidos para vê-los aqui',
+                                'Marque filmes como assistidos\npara vê-los aqui',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 14,
@@ -176,53 +148,36 @@ class _WatchedScreenState extends State<WatchedScreen> {
                       )
                     : SliverToBoxAdapter(
                         child: MovieSection(
-                          title: 'Filmes Assistidos',
-                          movies: _watchedMovies.map((movie) => {
-                            'title': movie.title,
-                            'subtitle': movie.description ?? 'Sem descrição',
-                            'imageUrl': movie.posterUrl,
-                            'isFavorite': movie.isFavorite,
-                          }).toList(),
+                          title: 'Seus Filmes Assistidos',
+                          movies: _watchedMovies
+                              .map(
+                                (movie) => {
+                                  'id': movie.id,
+                                  'title': movie.title,
+                                  'subtitle':
+                                      movie.description ?? 'Sem descrição',
+                                  'imageUrl': movie.posterUrl,
+                                  'isFavorite': movie.isFavorite,
+                                  'isWatched': movie.isWatched,
+                                },
+                              )
+                              .toList(),
+                          onFavoriteToggle: (movieId, isFavorite) async {
+                            if (movieId != null) {
+                              await _movieDao.updateFavoriteStatus(movieId, isFavorite);
+                              await _loadWatchedMovies();
+                            }
+                          },
+                          onWatchedToggle: (movieId, isWatched) async {
+                            if (movieId != null) {
+                              await _movieDao.updateWatchedStatus(movieId, isWatched);
+                              await _loadWatchedMovies();
+                            }
+                          },
                         ),
                       ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
-      ],
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            icon,
-            color: AppTheme.primaryBlue,
-            size: 24,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
-        ),
       ],
     );
   }

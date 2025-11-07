@@ -5,12 +5,16 @@ class MovieSection extends StatelessWidget {
   final String title;
   final List<Map<String, dynamic>> movies;
   final VoidCallback? onSeeAll;
+  final Function(int? movieId, bool isFavorite)? onFavoriteToggle;
+  final Function(int? movieId, bool isWatched)? onWatchedToggle;
 
   const MovieSection({
     super.key,
     required this.title,
     required this.movies,
     this.onSeeAll,
+    this.onFavoriteToggle,
+    this.onWatchedToggle,
   });
 
   @override
@@ -58,11 +62,16 @@ class MovieSection extends StatelessWidget {
             itemCount: movies.length,
             itemBuilder: (context, index) {
               final movie = movies[index];
+              final movieId = movie['id'] as int?;
+              final isFavorite = movie['isFavorite'] ?? false;
+              final isWatched = movie['isWatched'] ?? false;
+              
               return MovieCard(
                 title: movie['title'] ?? 'Título do Filme',
                 subtitle: movie['subtitle'],
                 imageUrl: movie['imageUrl'],
-                isFavorite: movie['isFavorite'] ?? false,
+                isFavorite: isFavorite,
+                isWatched: isWatched,
                 onTap: () {
                   // TODO: Navigate to movie details
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -71,14 +80,12 @@ class MovieSection extends StatelessWidget {
                     ),
                   );
                 },
-                onFavoritePressed: () {
-                  // TODO: Toggle favorite status
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Favorito: ${movie['title']}'),
-                    ),
-                  );
-                },
+                onFavoritePressed: movieId != null && onFavoriteToggle != null
+                    ? () => onFavoriteToggle!(movieId, !isFavorite)
+                    : null,
+                onWatchedPressed: movieId != null && onWatchedToggle != null
+                    ? () => onWatchedToggle!(movieId, !isWatched)
+                    : null,
               );
             },
           ),

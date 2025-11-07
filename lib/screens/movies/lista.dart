@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../models/movie.dart';
 import '../../widgets/movie_card.dart';
 import '../../services/tmdb_service.dart';
+import '../../database/movie_dao.dart';
 import 'formulario.dart';
 
 // REQUISITO: screens/ - Telas do app (lista, formulário, detalhes)
@@ -15,26 +16,51 @@ class MovieListScreen extends StatefulWidget {
 
 class _MovieListScreenState extends State<MovieListScreen> {
   final List<Movie> _movies = <Movie>[];
-  final _service = TmdbService();
   bool _loading = false;
   String _error = '';
+  final MovieDao _movieDao = MovieDao();
 
   @override
   void initState() {
     super.initState();
-    _loadPopular();
+    _loadAllMovies();
   }
 
-  Future<void> _loadPopular() async {
+  Future<void> _loadAllMovies() async {
     setState(() {
       _loading = true;
       _error = '';
     });
     try {
-      print('🚀 Iniciando carregamento de filmes populares...');
-      final data = await _service.popularMovies();
-      print('✅ ${data.length} filmes carregados com sucesso!');
-      setState(() => _movies.addAll(data));
+      print('🚀 Iniciando carregamento de todos os filmes...');
+      
+      // Carrega filmes do banco de dados
+      final dbMovies = await _movieDao.findAll();
+      
+      // Se não houver filmes no banco, carrega da API e salva
+      if (dbMovies.isEmpty) {
+        final tmdbService = TmdbService();
+        final apiMovies = await tmdbService.popularMovies();
+        
+        // Salva os filmes da API no banco
+        for (var movie in apiMovies) {
+          await _movieDao.insertOrUpdate(movie);
+        }
+        
+        // Recarrega do banco
+        final savedMovies = await _movieDao.findAll();
+        setState(() {
+          _movies.clear();
+          _movies.addAll(savedMovies);
+        });
+      } else {
+        setState(() {
+          _movies.clear();
+          _movies.addAll(dbMovies);
+        });
+      }
+      
+      print('✅ ${_movies.length} filmes carregados!');
     } catch (e) {
       print('💥 Erro ao carregar filmes: $e');
       setState(() => _error = 'Erro ao carregar filmes: $e');
@@ -50,11 +76,21 @@ class _MovieListScreenState extends State<MovieListScreen> {
       MaterialPageRoute(builder: (_) => const MovieFormScreen()),
     );
     if (result != null) {
-      // REQUISITO: Atualização Dinâmica da Lista - setState() para atualizar lista
-      setState(() => _movies.add(result));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Filme adicionado!')),
-      );
+      try {
+        // Salva o filme no banco de dados
+        final id = await _movieDao.insert(result);
+        final savedMovie = result.copyWith(id: id);
+        
+        // REQUISITO: Atualização Dinâmica da Lista - setState() para atualizar lista
+        setState(() => _movies.insert(0, savedMovie));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Filme adicionado!')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar filme: $e')),
+        );
+      }
     }
   }
 
@@ -100,7 +136,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _loadPopular,
+                        onPressed: _loadAllMovies,
                         child: const Text('Tentar novamente'),
                       ),
                     ],
@@ -108,28 +144,19 @@ class _MovieListScreenState extends State<MovieListScreen> {
                 )
               : _movies.isEmpty
                   ? const Center(
-                      child: Text('Nenhum filme. Toque em + para adicionar.'))
+                      child: Text('Nenhum filme. Toque em + para adicionar.'),)
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _movies.length,
                       itemBuilder: (_, index) {
                         final movie = _movies[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // REQUISITO: Tela Inicial – Lista - Exibir lista dinâmica em Card
-                              MovieCard(
-                                title: movie.title,
-                                subtitle: movie.description ??
-                                    'Criado em ${dateFormat.format(movie.createdAt)}',
-                                imageUrl: movie.posterUrl,
-                                showFavoriteIcon: false,
-                                onTap: () {},
-                              ),
-                            ],
-                          ),
+                        return MovieCard(
+                          title: movie.title,
+                          subtitle: movie.description ??
+                              'Criado em ${dateFormat.format(movie.createdAt)}',
+                          imageUrl: movie.posterUrl,
+                          showFavoriteIcon: false,
+                          onTap: () {},
                         );
                       },
                     ),

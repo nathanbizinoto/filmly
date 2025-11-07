@@ -3,11 +3,12 @@ import '../widgets/movie_section.dart';
 import '../theme/app_theme.dart';
 import '../services/tmdb_service.dart';
 import '../models/movie.dart';
+import '../database/movie_dao.dart';
 import 'favorites_screen.dart';
 import 'watched_screen.dart';
 import 'profile_screen.dart';
-import 'movies/lista.dart';
 
+// REQUISITO: screens/ - Telas do app (lista, formulário, detalhes)
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,17 +19,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  final MovieDao _movieDao = MovieDao();
   
-  // Serviço TMDB
-  final TmdbService _tmdbService = TmdbService();
-  
-  // Listas de filmes reais
   List<Movie> _popularMovies = [];
   List<Movie> _favoriteMovies = [];
   List<Movie> _watchedMovies = [];
   
   bool _loading = false;
-  String _error = '';
 
   @override
   void initState() {
@@ -42,28 +39,86 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recarrega favoritos e assistidos quando a tela é acessada novamente
+    if (!_loading) {
+      _loadFavoritesAndWatched();
+    }
+  }
+
   Future<void> _loadMovies() async {
     setState(() {
       _loading = true;
-      _error = '';
     });
     
     try {
       print('🏠 Carregando filmes para a tela inicial...');
-      final movies = await _tmdbService.popularMovies();
+      
+      // Carrega filmes populares da API
+      final tmdbService = TmdbService();
+      final apiMovies = await tmdbService.popularMovies();
+      
+      // Salva os filmes populares no banco (se ainda não existirem)
+      for (var movie in apiMovies) {
+        await _movieDao.insertOrUpdate(movie);
+      }
+      
+      // Recarrega do banco para ter os IDs corretos
+      final allMovies = await _movieDao.findAll();
+      // Filtra apenas os filmes que estão na lista da API (por tmdbId)
+      final popularMovies = apiMovies.map((apiMovie) {
+        final dbMovie = allMovies.firstWhere(
+          (m) => m.tmdbId == apiMovie.tmdbId,
+          orElse: () => apiMovie,
+        );
+        return dbMovie;
+      }).toList();
+      
+      // Carrega favoritos e assistidos do banco
+      final favoriteMovies = await _movieDao.findFavorites();
+      final watchedMovies = await _movieDao.findWatched();
       
       setState(() {
-        _popularMovies = movies.take(6).toList(); // Primeiros 6 filmes para sugestões
+        _popularMovies = popularMovies;
+        _favoriteMovies = favoriteMovies;
+        _watchedMovies = watchedMovies;
         _loading = false;
       });
       
-      print('✅ ${_popularMovies.length} filmes carregados para a tela inicial');
+      print('✅ ${_popularMovies.length} filmes populares carregados');
+      print('✅ ${_favoriteMovies.length} filmes favoritos carregados');
+      print('✅ ${_watchedMovies.length} filmes assistidos carregados');
     } catch (e) {
       print('💥 Erro ao carregar filmes na tela inicial: $e');
       setState(() {
-        _error = 'Erro ao carregar filmes: $e';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadFavoritesAndWatched() async {
+    try {
+      final favoriteMovies = await _movieDao.findFavorites();
+      final watchedMovies = await _movieDao.findWatched();
+      
+      setState(() {
+        _favoriteMovies = favoriteMovies;
+        _watchedMovies = watchedMovies;
+      });
+    } catch (e) {
+      print('💥 Erro ao recarregar favoritos e assistidos: $e');
+    }
+  }
+
+  void _performSearch(String query) {
+    if (query.isNotEmpty) {
+      Navigator.pushNamed(
+        context,
+        '/movies',
+        arguments: query,
+      );
     }
   }
 
@@ -91,22 +146,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 28,
               ),
               onPressed: () {
-                setState(() {
-                  _currentIndex = 3; // Navigate to profile tab
-                });
+                Navigator.pushNamed(context, '/profile');
               },
             ),
             IconButton(
               icon: const Icon(
                 Icons.list_alt,
                 color: AppTheme.textPrimary,
-                size: 26,
+                size: 28,
               ),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MovieListScreen()),
-                );
+                Navigator.pushNamed(context, '/movies');
               },
               tooltip: 'Lista dinâmica',
             ),
@@ -124,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -145,10 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 onSubmitted: (value) {
-                  // TODO: Implement search functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Buscando por: $value')),
-                  );
+                  _performSearch(value);
                 },
               ),
             ),
@@ -157,41 +204,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Suggestions Section
         SliverToBoxAdapter(
-          child: _loading
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _error.isNotEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Text('Erro: $_error'),
-                            ElevatedButton(
-                              onPressed: _loadMovies,
-                              child: const Text('Tentar novamente'),
-                            ),
-                          ],
-                        ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/movies');
+                    },
+                    icon: const Icon(Icons.trending_up),
+                    label: const Text('Tendências'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: AppTheme.textLight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    )
-                  : MovieSection(
-                      title: 'Sugestões',
-                      movies: _popularMovies.map((movie) => {
-                        'title': movie.title,
-                        'subtitle': movie.description ?? 'Sem descrição',
-                        'imageUrl': movie.posterUrl,
-                        'isFavorite': movie.isFavorite,
-                      }).toList(),
-                      onSeeAll: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MovieListScreen()),
-                        );
-                      },
                     ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/movies');
+                    },
+                    icon: const Icon(Icons.star),
+                    label: const Text('Populares'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryPurple,
+                      foregroundColor: AppTheme.textLight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+        // Popular Movies Section
+        SliverToBoxAdapter(
+          child: MovieSection(
+            title: 'Filmes Populares',
+            movies: _popularMovies.map((movie) => {
+              'id': movie.id,
+              'title': movie.title,
+              'subtitle': movie.description ?? 'Sem descrição',
+              'imageUrl': movie.posterUrl,
+              'isFavorite': movie.isFavorite,
+              'isWatched': movie.isWatched,
+            },).toList(),
+            onSeeAll: () {
+              Navigator.pushNamed(context, '/movies');
+            },
+            onFavoriteToggle: (movieId, isFavorite) async {
+              if (movieId != null) {
+                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
+                await _loadFavoritesAndWatched();
+                if (mounted) {
+                  setState(() {
+                    // Atualiza o filme na lista local
+                    final index = _popularMovies.indexWhere((m) => m.id == movieId);
+                    if (index != -1) {
+                      _popularMovies[index] = _popularMovies[index].copyWith(isFavorite: isFavorite);
+                    }
+                  });
+                }
+              }
+            },
+            onWatchedToggle: (movieId, isWatched) async {
+              if (movieId != null) {
+                await _movieDao.updateWatchedStatus(movieId, isWatched);
+                await _loadFavoritesAndWatched();
+                if (mounted) {
+                  setState(() {
+                    // Atualiza o filme na lista local
+                    final index = _popularMovies.indexWhere((m) => m.id == movieId);
+                    if (index != -1) {
+                      _popularMovies[index] = _popularMovies[index].copyWith(isWatched: isWatched);
+                    }
+                  });
+                }
+              }
+            },
+          ),
         ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -201,15 +303,27 @@ class _HomeScreenState extends State<HomeScreen> {
           child: MovieSection(
             title: 'Favoritos',
             movies: _favoriteMovies.map((movie) => {
+              'id': movie.id,
               'title': movie.title,
               'subtitle': movie.description ?? 'Sem descrição',
               'imageUrl': movie.posterUrl,
               'isFavorite': movie.isFavorite,
-            }).toList(),
+              'isWatched': movie.isWatched,
+            },).toList(),
             onSeeAll: () {
-              setState(() {
-                _currentIndex = 1; // Navigate to favorites tab
-              });
+              Navigator.pushNamed(context, '/favorites');
+            },
+            onFavoriteToggle: (movieId, isFavorite) async {
+              if (movieId != null) {
+                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
+                await _loadFavoritesAndWatched();
+              }
+            },
+            onWatchedToggle: (movieId, isWatched) async {
+              if (movieId != null) {
+                await _movieDao.updateWatchedStatus(movieId, isWatched);
+                await _loadFavoritesAndWatched();
+              }
             },
           ),
         ),
@@ -221,15 +335,27 @@ class _HomeScreenState extends State<HomeScreen> {
           child: MovieSection(
             title: 'Assistidos',
             movies: _watchedMovies.map((movie) => {
+              'id': movie.id,
               'title': movie.title,
               'subtitle': movie.description ?? 'Sem descrição',
               'imageUrl': movie.posterUrl,
               'isFavorite': movie.isFavorite,
-            }).toList(),
+              'isWatched': movie.isWatched,
+            },).toList(),
             onSeeAll: () {
-              setState(() {
-                _currentIndex = 2; // Navigate to watched tab
-              });
+              Navigator.pushNamed(context, '/watched');
+            },
+            onFavoriteToggle: (movieId, isFavorite) async {
+              if (movieId != null) {
+                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
+                await _loadFavoritesAndWatched();
+              }
+            },
+            onWatchedToggle: (movieId, isWatched) async {
+              if (movieId != null) {
+                await _movieDao.updateWatchedStatus(movieId, isWatched);
+                await _loadFavoritesAndWatched();
+              }
             },
           ),
         ),
@@ -263,11 +389,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          // Atalho direto para o formulário, mantendo a home simples.
           final result = await Navigator.pushNamed(context, '/movies');
           if (!mounted) return;
           if (result != null) {
-            // Apenas feedback; a lista dinâmica está na tela de Movies.
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Item criado na lista de filmes.')),
             );
@@ -279,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -308,10 +432,10 @@ class _HomeScreenState extends State<HomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
-              label: 'Início',
+              label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_border),
+              icon: Icon(Icons.favorite_outline),
               activeIcon: Icon(Icons.favorite),
               label: 'Favoritos',
             ),

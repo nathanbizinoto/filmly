@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/movies/lista.dart';
 import 'theme/app_theme.dart';
+import 'screens/favorites_screen.dart';
+import 'screens/watched_screen.dart';
+import 'screens/profile_screen.dart';
 
 // REQUISITO: main.dart - Ponto de entrada e configuração global do aplicativo
 void main() {
@@ -22,8 +26,12 @@ class FilmlyApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
         '/movies': (context) => const MovieListScreen(),
+        '/favorites': (context) => const FavoritesScreen(),
+        '/watched': (context) => const WatchedScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }

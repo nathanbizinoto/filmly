@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../secrets.dart';
+import '../config/secrets.dart';
 import '../models/movie.dart';
 
 class TmdbService {
@@ -8,6 +8,7 @@ class TmdbService {
   static const String _images = 'https://image.tmdb.org/t/p/w500';
 
   final String _apiKey;
+  
   TmdbService({String? apiKey}) : _apiKey = apiKey ?? Secrets.tmdbApiKey;
 
   Map<String, String> get _headers => {
@@ -22,14 +23,13 @@ class TmdbService {
     }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final results = (data['results'] as List<dynamic>?) ?? [];
-    return results.map((e) {
+    
+    final movies = results.map((e) {
       final map = e as Map<String, dynamic>;
-      return Movie(
-        title: map['title'] ?? 'Sem título',
-        description: map['overview'],
-        posterUrl: map['poster_path'] != null ? '$_images${map['poster_path']}' : null,
-      );
+      return Movie.fromTmdb(map);
     }).toList();
+    
+    return movies;
   }
 
   Future<List<Movie>> popularMovies() async {
@@ -51,24 +51,20 @@ class TmdbService {
       
       print('🎬 Filmes encontrados: ${results.length}');
       
-      return results.map((e) {
+      final movies = results.map((e) {
         final map = e as Map<String, dynamic>;
         final posterPath = map['poster_path'];
         final posterUrl = posterPath != null ? '$_images$posterPath' : null;
         
         print('🎭 Filme: ${map['title']} - Poster: $posterUrl');
         
-        return Movie(
-          title: map['title'] ?? 'Sem título',
-          description: map['overview'],
-          posterUrl: posterUrl,
-        );
+        return Movie.fromTmdb(map);
       }).toList();
+      
+      return movies;
     } catch (e) {
       print('💥 Erro na requisição: $e');
       rethrow;
     }
   }
 }
-
-

@@ -8,7 +8,9 @@ class MovieCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool showFavoriteIcon;
   final bool isFavorite;
+  final bool isWatched;
   final VoidCallback? onFavoritePressed;
+  final VoidCallback? onWatchedPressed;
 
   const MovieCard({
     super.key,
@@ -18,7 +20,9 @@ class MovieCard extends StatelessWidget {
     this.onTap,
     this.showFavoriteIcon = true,
     this.isFavorite = false,
+    this.isWatched = false,
     this.onFavoritePressed,
+    this.onWatchedPressed,
   });
 
   @override
@@ -77,7 +81,7 @@ class MovieCard extends StatelessWidget {
                     _buildPlaceholder(),
 
                   // Favorite Icon
-                  if (showFavoriteIcon)
+                  if (showFavoriteIcon && onFavoritePressed != null)
                     Positioned(
                       top: 8,
                       right: 8,
@@ -93,6 +97,29 @@ class MovieCard extends StatelessWidget {
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             color: isFavorite
                                 ? AppTheme.primaryBlue
+                                : Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Watched Icon
+                  if (onWatchedPressed != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: GestureDetector(
+                        onTap: onWatchedPressed,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isWatched ? Icons.check_circle : Icons.check_circle_outline,
+                            color: isWatched
+                                ? Colors.green
                                 : Colors.white,
                             size: 20,
                           ),
