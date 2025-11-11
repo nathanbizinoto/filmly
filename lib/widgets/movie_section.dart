@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'movie_card.dart';
+import 'ab_movie_card.dart';
 
 class MovieSection extends StatelessWidget {
   final String title;
@@ -7,6 +8,7 @@ class MovieSection extends StatelessWidget {
   final VoidCallback? onSeeAll;
   final Function(int? movieId, bool isFavorite)? onFavoriteToggle;
   final Function(int? movieId, bool isWatched)? onWatchedToggle;
+  final bool useABTest;
 
   const MovieSection({
     super.key,
@@ -15,6 +17,7 @@ class MovieSection extends StatelessWidget {
     this.onSeeAll,
     this.onFavoriteToggle,
     this.onWatchedToggle,
+    this.useABTest = false,
   });
 
   @override
@@ -65,28 +68,54 @@ class MovieSection extends StatelessWidget {
               final movieId = movie['id'] as int?;
               final isFavorite = movie['isFavorite'] ?? false;
               final isWatched = movie['isWatched'] ?? false;
-              
-              return MovieCard(
-                title: movie['title'] ?? 'Título do Filme',
-                subtitle: movie['subtitle'],
-                imageUrl: movie['imageUrl'],
-                isFavorite: isFavorite,
-                isWatched: isWatched,
-                onTap: () {
-                  // TODO: Navigate to movie details
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Clicou em: ${movie['title']}'),
-                    ),
-                  );
-                },
-                onFavoritePressed: movieId != null && onFavoriteToggle != null
-                    ? () => onFavoriteToggle!(movieId, !isFavorite)
-                    : null,
-                onWatchedPressed: movieId != null && onWatchedToggle != null
-                    ? () => onWatchedToggle!(movieId, !isWatched)
-                    : null,
-              );
+
+              return useABTest
+                  ? ABMovieCard(
+                      title: movie['title'] ?? 'Título do Filme',
+                      subtitle: movie['subtitle'],
+                      imageUrl: movie['imageUrl'],
+                      isFavorite: isFavorite,
+                      isWatched: isWatched,
+                      onTap: () {
+                        // TODO: Navigate to movie details
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Clicou em: ${movie['title']}'),
+                          ),
+                        );
+                      },
+                      onFavoritePressed:
+                          movieId != null && onFavoriteToggle != null
+                              ? () => onFavoriteToggle!(movieId, !isFavorite)
+                              : null,
+                      onWatchedPressed:
+                          movieId != null && onWatchedToggle != null
+                              ? () => onWatchedToggle!(movieId, !isWatched)
+                              : null,
+                    )
+                  : MovieCard(
+                      title: movie['title'] ?? 'Título do Filme',
+                      subtitle: movie['subtitle'],
+                      imageUrl: movie['imageUrl'],
+                      isFavorite: isFavorite,
+                      isWatched: isWatched,
+                      onTap: () {
+                        // TODO: Navigate to movie details
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Clicou em: ${movie['title']}'),
+                          ),
+                        );
+                      },
+                      onFavoritePressed:
+                          movieId != null && onFavoriteToggle != null
+                              ? () => onFavoriteToggle!(movieId, !isFavorite)
+                              : null,
+                      onWatchedPressed:
+                          movieId != null && onWatchedToggle != null
+                              ? () => onWatchedToggle!(movieId, !isWatched)
+                              : null,
+                    );
             },
           ),
         ),
