@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/user_session.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final userSession = UserSession();
+    final user = userSession.currentUser;
     return CustomScrollView(
       slivers: [
         // App Bar
@@ -62,9 +65,9 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // User Info
-                  const Text(
-                    'João Silva',
-                    style: TextStyle(
+                  Text(
+                    user?.name ?? user?.email ?? 'Usuário',
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textPrimary,
@@ -72,7 +75,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'joao.silva@email.com',
+                    user?.email ?? 'email@exemplo.com',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey.shade600,
@@ -151,6 +154,13 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.help_outline,
                     title: 'Ajuda e Suporte',
                     onTap: () => _showComingSoon(context),
+                  ),
+                  _buildDivider(),
+                  _buildMenuItem(
+                    icon: Icons.science_outlined,
+                    title: 'Testes A/B',
+                    subtitle: 'Configurações de experimentos',
+                    onTap: () => Navigator.pushNamed(context, '/ab-tests'),
                   ),
                   _buildDivider(),
                   _buildMenuItem(
@@ -286,8 +296,10 @@ class ProfileScreen extends StatelessWidget {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
+              // Faz logout usando o sistema de sessão
+              await UserSession().logout();
               Navigator.pushReplacementNamed(context, '/login');
             },
             style: TextButton.styleFrom(

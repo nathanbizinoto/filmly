@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../database/user_dao.dart';
+import '../services/user_session.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  final UserDao _userDao = UserDao();
 
   @override
   void dispose() {
@@ -36,17 +36,19 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Autentica o usuário no banco de dados
-      final user = await _userDao.authenticate(email, password);
+      // Usa o sistema de sessão para fazer login
+      final userSession = UserSession();
+      final success = await userSession.login(email, password);
 
       if (mounted) {
         setState(() => _isLoading = false);
 
-        if (user != null) {
+        if (success) {
           // Login bem-sucedido
           Navigator.pushReplacementNamed(context, '/home');
-          
+
           // Mostra mensagem de boas-vindas
+          final user = userSession.currentUser!;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Bem-vindo, ${user.name ?? user.email}!'),
@@ -102,9 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Colors.white,
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 const Text(
                   'Bem-vindo ao Filmly',
                   style: TextStyle(
@@ -113,9 +115,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: AppTheme.textPrimary,
                   ),
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 const Text(
                   'Sua plataforma de filmes favorita',
                   style: TextStyle(
@@ -123,9 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: AppTheme.textSecondary,
                   ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Campo de email
                 TextFormField(
                   controller: _emailController,
@@ -144,9 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Campo de senha
                 TextFormField(
                   controller: _passwordController,
@@ -165,9 +167,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Mensagem de erro
                 if (_errorMessage != null)
                   Container(
@@ -180,7 +182,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        Icon(Icons.error_outline,
+                            color: Colors.red.shade700, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -194,9 +197,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Botão de login
                 SizedBox(
                   width: double.infinity,
@@ -213,7 +216,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(
@@ -222,9 +226,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Link para registro
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
