@@ -29,7 +29,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -70,6 +70,22 @@ class DatabaseHelper {
         updated_at $textType
       )
     ''');
+
+    // Tabela de associação usuário-filme
+    await db.execute('''
+      CREATE TABLE user_movies (
+        id $idType,
+        user_id $integerType,
+        movie_id $integerType,
+        is_favorite $integerType DEFAULT 0,
+        is_watched $integerType DEFAULT 0,
+        created_at $textType,
+        updated_at $textType,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (movie_id) REFERENCES movies (id) ON DELETE CASCADE,
+        UNIQUE(user_id, movie_id)
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -83,6 +99,24 @@ class DatabaseHelper {
           name TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
+        )
+      ''');
+    }
+
+    if (oldVersion < 3) {
+      // Adiciona tabela de associação usuário-filme
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_movies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          movie_id INTEGER NOT NULL,
+          is_favorite INTEGER NOT NULL DEFAULT 0,
+          is_watched INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (movie_id) REFERENCES movies (id) ON DELETE CASCADE,
+          UNIQUE(user_id, movie_id)
         )
       ''');
     }

@@ -4,6 +4,8 @@ import '../theme/app_theme.dart';
 import '../services/tmdb_service.dart';
 import '../models/movie.dart';
 import '../database/movie_dao.dart';
+import '../database/user_movie_dao.dart';
+import '../services/user_session.dart';
 import 'favorites_screen.dart';
 import 'watched_screen.dart';
 import 'profile_screen.dart';
@@ -20,11 +22,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   final MovieDao _movieDao = MovieDao();
-  
+  final UserMovieDao _userMovieDao = UserMovieDao();
+
   List<Movie> _popularMovies = [];
   List<Movie> _favoriteMovies = [];
   List<Movie> _watchedMovies = [];
-  
+
   bool _loading = false;
 
   @override
@@ -52,19 +55,19 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _loading = true;
     });
-    
+
     try {
       print('🏠 Carregando filmes para a tela inicial...');
-      
+
       // Carrega filmes populares da API
       final tmdbService = TmdbService();
       final apiMovies = await tmdbService.popularMovies();
-      
+
       // Salva os filmes populares no banco (se ainda não existirem)
       for (var movie in apiMovies) {
         await _movieDao.insertOrUpdate(movie);
       }
-      
+
       // Recarrega do banco para ter os IDs corretos
       final allMovies = await _movieDao.findAll();
       // Filtra apenas os filmes que estão na lista da API (por tmdbId)
@@ -75,18 +78,41 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         return dbMovie;
       }).toList();
-      
-      // Carrega favoritos e assistidos do banco
-      final favoriteMovies = await _movieDao.findFavorites();
-      final watchedMovies = await _movieDao.findWatched();
-      
+
+      // Carrega favoritos e assistidos do usuário logado
+      final userSession = UserSession();
+      final currentUser = userSession.currentUser;
+
+      List<Movie> favoriteMovies = [];
+      List<Movie> watchedMovies = [];
+
+      if (currentUser != null) {
+        favoriteMovies =
+            await _userMovieDao.findFavoriteMoviesByUser(currentUser.id!);
+        watchedMovies =
+            await _userMovieDao.findWatchedMoviesByUser(currentUser.id!);
+
+        // Atualiza o status dos filmes populares baseado nas preferências do usuário
+        for (int i = 0; i < popularMovies.length; i++) {
+          final movie = popularMovies[i];
+          if (movie.id != null) {
+            final status = await _userMovieDao.getMovieStatusForUser(
+                currentUser.id!, movie.id!);
+            popularMovies[i] = movie.copyWith(
+              isFavorite: status['isFavorite'],
+              isWatched: status['isWatched'],
+            );
+          }
+        }
+      }
+
       setState(() {
         _popularMovies = popularMovies;
         _favoriteMovies = favoriteMovies;
         _watchedMovies = watchedMovies;
         _loading = false;
       });
-      
+
       print('✅ ${_popularMovies.length} filmes populares carregados');
       print('✅ ${_favoriteMovies.length} filmes favoritos carregados');
       print('✅ ${_watchedMovies.length} filmes assistidos carregados');
@@ -100,13 +126,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFavoritesAndWatched() async {
     try {
-      final favoriteMovies = await _movieDao.findFavorites();
-      final watchedMovies = await _movieDao.findWatched();
-      
-      setState(() {
-        _favoriteMovies = favoriteMovies;
-        _watchedMovies = watchedMovies;
-      });
+      final userSession = UserSession();
+      final currentUser = userSession.currentUser;
+
+      if (currentUser != null) {
+        final favoriteMovies =
+            await _userMovieDao.findFavoriteMoviesByUser(currentUser.id!);
+        final watchedMovies =
+            await _userMovieDao.findWatchedMoviesByUser(currentUser.id!);
+
+        setState(() {
+          _favoriteMovies = favoriteMovies;
+          _watchedMovies = watchedMovies;
+        });
+      }
     } catch (e) {
       print('💥 Erro ao recarregar favoritos e assistidos: $e');
     }
@@ -146,7 +179,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 28,
               ),
               onPressed: () {
-                Navigator.pushNamed(context, '/profile');
+                // Navega para a aba de perfil no menu inferior
+                setState(() {
+                  _currentIndex = 3;
+                });
               },
             ),
             IconButton(
@@ -252,44 +288,63 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: MovieSection(
             title: 'Filmes Populares',
-            movies: _popularMovies.map((movie) => {
-              'id': movie.id,
-              'title': movie.title,
-              'subtitle': movie.description ?? 'Sem descrição',
-              'imageUrl': movie.posterUrl,
-              'isFavorite': movie.isFavorite,
-              'isWatched': movie.isWatched,
-            },).toList(),
+            useABTest: true, // Ativa o teste A/B para esta seção
+            movies: _popularMovies
+                .map(
+                  (movie) => {
+                    'id': movie.id,
+                    'title': movie.title,
+                    'subtitle': movie.description ?? 'Sem descrição',
+                    'imageUrl': movie.posterUrl,
+                    'isFavorite': movie.isFavorite,
+                    'isWatched': movie.isWatched,
+                  },
+                )
+                .toList(),
             onSeeAll: () {
               Navigator.pushNamed(context, '/movies');
             },
             onFavoriteToggle: (movieId, isFavorite) async {
               if (movieId != null) {
-                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
-                await _loadFavoritesAndWatched();
-                if (mounted) {
-                  setState(() {
-                    // Atualiza o filme na lista local
-                    final index = _popularMovies.indexWhere((m) => m.id == movieId);
-                    if (index != -1) {
-                      _popularMovies[index] = _popularMovies[index].copyWith(isFavorite: isFavorite);
-                    }
-                  });
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateFavoriteStatus(
+                      currentUser.id!, movieId, isFavorite);
+                  await _loadFavoritesAndWatched();
+                  if (mounted) {
+                    setState(() {
+                      // Atualiza o filme na lista local
+                      final index =
+                          _popularMovies.indexWhere((m) => m.id == movieId);
+                      if (index != -1) {
+                        _popularMovies[index] = _popularMovies[index]
+                            .copyWith(isFavorite: isFavorite);
+                      }
+                    });
+                  }
                 }
               }
             },
             onWatchedToggle: (movieId, isWatched) async {
               if (movieId != null) {
-                await _movieDao.updateWatchedStatus(movieId, isWatched);
-                await _loadFavoritesAndWatched();
-                if (mounted) {
-                  setState(() {
-                    // Atualiza o filme na lista local
-                    final index = _popularMovies.indexWhere((m) => m.id == movieId);
-                    if (index != -1) {
-                      _popularMovies[index] = _popularMovies[index].copyWith(isWatched: isWatched);
-                    }
-                  });
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateWatchedStatus(
+                      currentUser.id!, movieId, isWatched);
+                  await _loadFavoritesAndWatched();
+                  if (mounted) {
+                    setState(() {
+                      // Atualiza o filme na lista local
+                      final index =
+                          _popularMovies.indexWhere((m) => m.id == movieId);
+                      if (index != -1) {
+                        _popularMovies[index] = _popularMovies[index]
+                            .copyWith(isWatched: isWatched);
+                      }
+                    });
+                  }
                 }
               }
             },
@@ -302,27 +357,41 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: MovieSection(
             title: 'Favoritos',
-            movies: _favoriteMovies.map((movie) => {
-              'id': movie.id,
-              'title': movie.title,
-              'subtitle': movie.description ?? 'Sem descrição',
-              'imageUrl': movie.posterUrl,
-              'isFavorite': movie.isFavorite,
-              'isWatched': movie.isWatched,
-            },).toList(),
+            movies: _favoriteMovies
+                .map(
+                  (movie) => {
+                    'id': movie.id,
+                    'title': movie.title,
+                    'subtitle': movie.description ?? 'Sem descrição',
+                    'imageUrl': movie.posterUrl,
+                    'isFavorite': movie.isFavorite,
+                    'isWatched': movie.isWatched,
+                  },
+                )
+                .toList(),
             onSeeAll: () {
               Navigator.pushNamed(context, '/favorites');
             },
             onFavoriteToggle: (movieId, isFavorite) async {
               if (movieId != null) {
-                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
-                await _loadFavoritesAndWatched();
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateFavoriteStatus(
+                      currentUser.id!, movieId, isFavorite);
+                  await _loadFavoritesAndWatched();
+                }
               }
             },
             onWatchedToggle: (movieId, isWatched) async {
               if (movieId != null) {
-                await _movieDao.updateWatchedStatus(movieId, isWatched);
-                await _loadFavoritesAndWatched();
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateWatchedStatus(
+                      currentUser.id!, movieId, isWatched);
+                  await _loadFavoritesAndWatched();
+                }
               }
             },
           ),
@@ -334,27 +403,41 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: MovieSection(
             title: 'Assistidos',
-            movies: _watchedMovies.map((movie) => {
-              'id': movie.id,
-              'title': movie.title,
-              'subtitle': movie.description ?? 'Sem descrição',
-              'imageUrl': movie.posterUrl,
-              'isFavorite': movie.isFavorite,
-              'isWatched': movie.isWatched,
-            },).toList(),
+            movies: _watchedMovies
+                .map(
+                  (movie) => {
+                    'id': movie.id,
+                    'title': movie.title,
+                    'subtitle': movie.description ?? 'Sem descrição',
+                    'imageUrl': movie.posterUrl,
+                    'isFavorite': movie.isFavorite,
+                    'isWatched': movie.isWatched,
+                  },
+                )
+                .toList(),
             onSeeAll: () {
               Navigator.pushNamed(context, '/watched');
             },
             onFavoriteToggle: (movieId, isFavorite) async {
               if (movieId != null) {
-                await _movieDao.updateFavoriteStatus(movieId, isFavorite);
-                await _loadFavoritesAndWatched();
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateFavoriteStatus(
+                      currentUser.id!, movieId, isFavorite);
+                  await _loadFavoritesAndWatched();
+                }
               }
             },
             onWatchedToggle: (movieId, isWatched) async {
               if (movieId != null) {
-                await _movieDao.updateWatchedStatus(movieId, isWatched);
-                await _loadFavoritesAndWatched();
+                final userSession = UserSession();
+                final currentUser = userSession.currentUser;
+                if (currentUser != null) {
+                  await _userMovieDao.updateWatchedStatus(
+                      currentUser.id!, movieId, isWatched);
+                  await _loadFavoritesAndWatched();
+                }
               }
             },
           ),
